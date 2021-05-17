@@ -1,0 +1,115 @@
+<html>
+
+<head>
+  <style>
+    main {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+    video {
+      margin: 20px 0px;
+      border: 1px solid #ccc;
+    }
+    .start {
+      background: #a033ff;
+      color: #fff;
+      border: none;
+      padding: 10px;
+    }
+    .stop {
+      background: #ffa033;
+      color: #fff;
+      border: none;
+      padding: 10px;
+    }
+    .start:disabled, .stop:disabled {
+      opacity: 50%;
+    }
+    code {
+      width: 500px;
+      margin: 20px 0;
+      padding: 10px;
+      display: block;
+      background-color: #e2e1e1;
+      line-height: 18px;
+    }
+  </style>
+  <script>
+    const sendStream = (data) => {
+      const request = new XMLHttpRequest();
+      request.open('POST', '/api/store', true);
+      request.setRequestHeader('Content-Type', 'application/octet-stream');
+      request.send(data);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const log = msg => document.querySelector('code').innerText += `[Log] ${msg} \n`;
+
+      const startButton = document.querySelector('.start');
+      const stopButton = document.querySelector('.stop');
+      const preview = document.querySelector('.preview');
+      let chunks = [];
+
+      if (navigator.mediaDevices) {
+        log('getUserMedia supported.');
+        startButton.disabled = false;
+      }
+
+      const constraints = {
+        audio: true,
+        video: {
+          width: { min: 1024, ideal: 1280, max: 1920 },
+          height: { min: 576, ideal: 720, max: 1080 }
+        }
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const mediaRecorder = new MediaRecorder(mediaStream);
+      const timeSlice = 1000;
+
+      preview.srcObject = mediaStream;
+
+      startButton.addEventListener('click', () => {
+        mediaRecorder.start(timeSlice);
+        startButton.disabled = true;
+        stopButton.disabled = false;
+        log('Started recording');
+        log('MediaRecorder state is ' + mediaRecorder.state);
+      });
+
+      stopButton.addEventListener('click', () => {
+        mediaRecorder.stop();
+        startButton.disabled = false;
+        stopButton.disabled = true;
+        log('Stopped recording');
+        log('MediaRecorder state is ' + mediaRecorder.state);
+      });
+
+      mediaRecorder.ondataavailable = function (e) {
+        console.log(e);
+        chunks.push(e.data);
+        log('sending buffer to server: ' + (e.data.size / 256).toFixed(1) + ' kb');
+        sendStream(e.data);
+      }
+    });
+  </script>
+</head>
+
+<body>
+  <main>
+    <div>
+      <video class="preview" width="1024" height="576" autoplay muted></video>
+    </div>
+    <div>
+      <button class="start" disabled>Start Recording</button>
+      <button class="stop" disabled>Stop Recording</button>
+    </div>
+    <div>
+      <code></code>
+    </div>
+  </main>
+</body>
+
+</html>
